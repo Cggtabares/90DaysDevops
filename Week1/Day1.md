@@ -4,7 +4,7 @@
 
 DevOps es una metodologia y cultura que permite a los equipos poder trabajar de forma colaborativa, compartiendo ideas y usando herramientas para que el desarrollo del software sea mas rapido, estable y con menos errores. 🚀
 
------
+---
 
 ## 🌟 Beneficios de la Cultura DevOps
 
@@ -14,7 +14,7 @@ DevOps es una metodologia y cultura que permite a los equipos poder trabajar de 
 ✅ **Más innovación**: Ciclos cortos = experimentar sin miedo.
 ✅ **Mejor colaboración**: Todos comparten responsabilidades.
 
------
+---
 
 ## El papel de Linux en DevOps
 
@@ -46,7 +46,7 @@ Linux es el **Corazon de DevOps** y del mundo IT. Cerca del **90% de los servido
 - Creacion y orquestacion de contenedores, sin Linux no hay esto.
 - Personalizacion de servidores para su control total
 
-------
+---
 
 ## 📚 Tarea Opcional del Día 1
 
