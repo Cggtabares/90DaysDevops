@@ -1,3 +1,5 @@
+# Day 2 - Introduccion a Linux y la Terminal
+
 ## 🐧 Comandos, estructura, usuarios y permisos
 
 ### 💻 Opciones para usar una terminal:
