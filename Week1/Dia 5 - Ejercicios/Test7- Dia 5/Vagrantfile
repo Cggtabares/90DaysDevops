@@ -1,0 +1,10 @@
+Vagrant.configure("2") do |config|
+# Usa una imagen ligera de Ubuntu 22.04
+  config.vm.box = "ubuntu/jammy64"
+  
+  # Configuración de red (accesible via IP)
+  config.vm.network "public_network", ip:"192.168.1.100"
+  
+  #Por defecto, Vagrant crea una carpeta compartida llamada /vagrant
+  # que apunta al directorio donde se encuentra el Vagrantfile y copia todo los archivos del proyecto
+end
