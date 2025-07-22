@@ -1,0 +1,19 @@
+---
+- name: Habilitar firewall
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    state: enabled
+    
+- name: Habilitar firewall HTTP
+  ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+    
+- name: Habilitar firewall HTTPS
+  ufw:
+    rule: allow
+    port: "443"
+    proto: tcp

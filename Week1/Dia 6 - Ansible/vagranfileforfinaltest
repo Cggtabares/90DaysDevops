@@ -1,0 +1,109 @@
+Vagrant.configure("2") do |config|
+
+  config.vm.define "AnsibleManagedNode" do |host|
+    host.vm.box = "ubuntu/trusty64"
+    host.vm.network "private_network", ip: "192.168.33.102"
+    host.vm.provider "virtualbox" do |v|
+      v.name = "AnsibleManagedNode"
+    end
+    
+    # Ensure SSH is properly configured on managed node
+    host.vm.provision "shell", inline: <<-SHELL
+      # Ensure SSH service is running and configured
+      sudo service ssh start
+      sudo update-rc.d ssh enable
+      
+      # Make sure vagrant user can use SSH
+      sudo mkdir -p /home/vagrant/.ssh
+      sudo chown vagrant:vagrant /home/vagrant/.ssh
+      sudo chmod 700 /home/vagrant/.ssh
+    SHELL
+  end  
+  
+  config.vm.define "AnsibleControlNode" do |control|
+    control.vm.box = "ubuntu/trusty64"
+    control.vm.network "private_network", ip: "192.168.33.101"
+    control.vm.provider "virtualbox" do |v|
+      v.name = "AnsibleControlNode"
+    end
+    
+    # Install Ansible and configure SSH
+    control.vm.provision "shell", inline: <<-SHELL
+      sudo apt-add-repository ppa:ansible/ansible
+      sudo apt-get update && sudo apt-get upgrade -y
+      sudo apt-get install -y --force-yes ansible sshpass
+      
+      # Generate SSH key for vagrant user
+      sudo -u vagrant ssh-keygen -t rsa -N "" -f /home/vagrant/.ssh/id_rsa
+      
+      # Set proper permissions for SSH keys
+      chown vagrant:vagrant /home/vagrant/.ssh/id_rsa*
+      chmod 600 /home/vagrant/.ssh/id_rsa      # Private key: read/write for owner only
+      chmod 644 /home/vagrant/.ssh/id_rsa.pub  # Public key: read for all, write for owner
+      
+      # Configure SSH to skip host key checking
+      cat > /home/vagrant/.ssh/config << 'EOF'
+Host 192.168.33.*
+    StrictHostKeyChecking no
+    UserKnownHostsFile=/dev/null
+    LogLevel ERROR
+    IdentityFile /home/vagrant/.ssh/id_rsa
+EOF
+      chown vagrant:vagrant /home/vagrant/.ssh/config
+      chmod 600 /home/vagrant/.ssh/config
+    SHELL
+    
+    # Copy files
+    control.vm.provision "file", source: "files/playbook.yml", destination: "/home/vagrant/playbook.yml"
+    control.vm.provision "file", source: "files/nginx.conf", destination: "/home/vagrant/nginx.conf"
+    control.vm.provision "file", source: "roles", destination: "/home/vagrant/roles"
+    
+    # Create inventory file
+    control.vm.provision "shell", inline: <<-SHELL
+      cat > /home/vagrant/inventory << 'EOF'
+[managed_nodes]
+192.168.33.102 ansible_user=vagrant ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa
+
+[all:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+EOF
+      chown vagrant:vagrant /home/vagrant/inventory
+    SHELL
+    
+    # Copy SSH key to managed node and run playbook
+    control.vm.provision "shell", inline: <<-SHELL
+      # Wait for managed node to be fully ready
+      echo "Waiting for managed node to be ready..."
+      for i in {1..30}; do
+        if ping -c 1 192.168.33.102 >/dev/null 2>&1; then
+          echo "Managed node is reachable"
+          break
+        else
+          echo "Waiting for managed node... attempt $i"
+          sleep 10
+        fi
+      done
+      
+      # Copy SSH key to managed node
+      echo "Copying SSH key to managed node..."
+      for i in {1..10}; do
+        if sudo -u vagrant sshpass -p vagrant ssh-copy-id -i /home/vagrant/.ssh/id_rsa.pub -o StrictHostKeyChecking=no vagrant@192.168.33.102; then
+          echo "SSH key copied successfully."
+          break
+        else
+          echo "Failed to copy SSH key, retrying in 10 seconds... attempt $i"
+          sleep 10
+        fi
+      done
+      
+      # Test SSH connection
+      echo "Testing SSH connection..."
+      sudo -u vagrant ssh -o StrictHostKeyChecking=no -i /home/vagrant/.ssh/id_rsa vagrant@192.168.33.102 'echo "SSH connection successful"'
+      
+      # Run Ansible playbook
+      cd /home/vagrant/
+      echo "Running Ansible playbook..."
+      sudo -u vagrant ansible-playbook -i inventory playbook.yml -vvv
+    SHELL
+  end
+end

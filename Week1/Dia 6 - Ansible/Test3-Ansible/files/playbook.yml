@@ -1,0 +1,9 @@
+---
+- name: tarea de configuracion basica de servidor
+  hosts: managed_nodes
+  become: true
+  roles:
+    - devops
+    - nginx
+    - firewall
+

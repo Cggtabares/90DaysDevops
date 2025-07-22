@@ -1,0 +1,107 @@
+---
+- name: tarea de configuracion basica de servidor
+  hosts: managed_nodes
+  become: true
+  
+  tasks:
+    - name: Instalar paquetes esenciales
+      apt:
+        name: ["git", "tree", "htop", "nginx", "unzip", "ufw"]
+        state: present
+        update_cache: yes  
+
+    - name: Unarchive a file that needs to be downloaded
+      ansible.builtin.unarchive:
+        src: https://github.com/StartBootstrap/startbootstrap-freelancer/archive/refs/heads/gh-pages.zip
+        dest: /home/vagrant/
+        remote_src: yes
+
+    - name: Create a directory bootstrap in /var/www/ if it does not exist
+      ansible.builtin.file:
+        path: /var/www/bootstrap/
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+    
+    #- name: Create a directory bootstrap in /etc/nginx/sites-enabled if it does not exist
+      #ansible.builtin.file:
+        #path: /etc/nginx/sites-enabled/bootstrap
+        #state: directory
+        #mode: '0755'
+
+    - name: Copy files from the folder
+      shell: |
+        cd /home/vagrant/
+        cp -a startbootstrap-freelancer-gh-pages/. /var/www/bootstrap/
+        chown -R www-data:www-data /var/www/bootstrap/
+
+    - name: Copiar archivo de conf de Nginx
+      ansible.builtin.copy:
+        src: /home/vagrant/nginx.conf
+        dest: /etc/nginx/sites-available/bootstrap
+
+    - name: Eliminar default file de Nginx
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Habilitar sitio
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/bootstrap
+        dest: /etc/nginx/sites-enabled/bootstrap
+        state: link
+    
+    - name: Test nginx configuration
+      command: nginx -t
+      register: nginx_test
+      
+    - name: Show nginx test results
+      debug:
+        var: nginx_test
+
+    - name: Restart service nginx, in all cases
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+
+    - name: Habilitar firewall
+      ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+        state: enabled
+    
+    - name: Habilitar firewall HTTP
+      ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+    
+    - name: Habilitar firewall HTTPS
+      ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+
+
+    #- name: Create a user 'johnd' with a home directory
+    #  ansible.builtin.user:
+    #   name: test_user
+    #   shell: /bin/bash
+    #   create_home: yes
+    #   groups: sudo
+
+    #- name: Create a 2048-bit SSH key for user jsmith in ~jsmith/.ssh/id_rsa
+    #  ansible.builtin.user:
+    #    name: test_user
+    #    generate_ssh_key: yes
+    #    ssh_key_bits: 2048
+    #    ssh_key_file: .ssh/id_rsa
+
+    #- name: Crear usuario deploy
+    #  user:
+    #    name: deploy
+    #    groups: sudo
+    #    append: yes
+    #    password: "{{ 'miPassword123' | password_hash('sha512') }}"

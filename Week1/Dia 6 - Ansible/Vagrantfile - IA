@@ -1,0 +1,136 @@
+Vagrant.configure("2") do |config|
+  # Define the Ansible Control Node
+  config.vm.define "control" do |control|
+    control.vm.box = "ubuntu/trusty64"
+    control.vm.hostname = "ansible-control"
+    control.vm.network "public_network", ip: "192.168.33.100"
+    
+    control.vm.provider "virtualbox" do |vb|
+      vb.memory = "1024"
+      vb.cpus = 1
+      vb.name = "AnsibleControlNode"
+    end
+    
+    # Install Ansible and setup SSH keys
+    control.vm.provision "shell", inline: <<-SHELL
+      # Update package lists
+      apt-get update
+      
+      # Install software-properties-common for add-apt-repository
+      apt-get install -y software-properties-common
+      
+      # Add Ansible PPA and install Ansible
+      add-apt-repository -y ppa:ansible/ansible
+      apt-get update
+      apt-get install -y ansible
+      
+      # Generate SSH key for vagrant user
+      sudo -u vagrant ssh-keygen -t rsa -N "" -f /home/vagrant/.ssh/id_rsa
+      
+      # Set proper permissions for SSH keys
+      chown vagrant:vagrant /home/vagrant/.ssh/id_rsa*
+      chmod 600 /home/vagrant/.ssh/id_rsa      # Private key: read/write for owner only
+      chmod 644 /home/vagrant/.ssh/id_rsa.pub  # Public key: read for all, write for owner
+    SHELL
+  end
+  
+  # Define the Managed Node
+  config.vm.define "managed" do |managed|
+    managed.vm.box = "ubuntu/trusty64"
+    managed.vm.hostname = "managed-node"
+    managed.vm.network "public_network", ip: "192.168.33.101"
+    
+    managed.vm.provider "virtualbox" do |vb|
+      vb.memory = "512"
+      vb.cpus = 1
+      vb.name = "ManagedNode"
+    end
+    
+    # Basic setup for managed node
+    managed.vm.provision "shell", inline: <<-SHELL
+      # Update package lists
+      apt-get update
+      
+      # Ensure SSH is properly configured
+      systemctl enable ssh
+      systemctl start ssh
+    SHELL
+    
+    # Your custom shell commands provisioned by Vagrant
+    managed.vm.provision "shell", inline: <<-SHELL
+      echo "¡Hola desde el provisionamiento!" > /tmp/hola.txt
+      apt update && apt install -y nginx
+      systemctl start nginx
+    SHELL
+  end
+  
+  # Final provisioning for Control Node (runs after all machines are up)
+  config.vm.define "control", primary: true do |control|
+    # Setup SSH connection to managed node
+    control.vm.provision "shell", inline: <<-SHELL
+      # Wait for managed node to be ready
+      while ! ping -c 1 192.168.33.101 &> /dev/null; do
+        echo "Waiting for managed node to be ready..."
+        sleep 2
+      done
+      
+      # Configure SSH to skip host key checking
+      sudo -u vagrant mkdir -p /home/vagrant/.ssh
+      cat >> /home/vagrant/.ssh/config << 'EOF'
+Host 192.168.33.*
+    StrictHostKeyChecking no
+    UserKnownHostsFile=/dev/null
+    LogLevel ERROR
+EOF
+      chown vagrant:vagrant /home/vagrant/.ssh/config
+      chmod 600 /home/vagrant/.ssh/config
+      
+      # Copy SSH key to managed node (with retries)
+      for i in {1..5}; do
+        if sudo -u vagrant ssh-copy-id -i /home/vagrant/.ssh/id_rsa.pub vagrant@192.168.33.101; then
+          echo "SSH key copied successfully"
+          break
+        else
+          echo "Attempt $i failed, retrying in 5 seconds..."
+          sleep 5
+        fi
+      done
+    SHELL
+    
+    # Create Ansible inventory file
+    control.vm.provision "shell", inline: <<-SHELL
+      cat > /home/vagrant/inventory << 'EOF'
+[managed_nodes]
+192.168.33.102 ansible_user=vagrant ansible_ssh_private_key_file=/home/vagrant/.ssh/id_rsa
+
+[all:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+EOF
+      chown vagrant:vagrant /home/vagrant/inventory
+    SHELL
+    
+    # Copy playbook.yml from files folder
+    control.vm.provision "file", source: "files/playbook.yml", destination: "/home/vagrant/playbook.yml"
+    
+    # Test SSH connection before running playbook
+    control.vm.provision "shell", inline: <<-SHELL
+      echo "Testing SSH connection to managed node..."
+      sudo -u vagrant ssh vagrant@192.168.33.101 'echo "SSH connection successful"'
+    SHELL
+    
+    # Run the Ansible playbook
+    control.vm.provision "shell", inline: <<-SHELL
+      cd /home/vagrant
+      echo "Running Ansible playbook..."
+      sudo -u vagrant ansible-playbook -i inventory playbook.yml -v
+    SHELL
+  end
+  
+  # SSH key sharing between nodes
+  config.vm.provision "shell", inline: <<-SHELL
+    # Ensure .ssh directory exists with proper permissions
+    sudo -u vagrant mkdir -p /home/vagrant/.ssh
+    chown vagrant:vagrant /home/vagrant/.ssh
+    chmod 700 /home/vagrant/.ssh
+  SHELL
+end

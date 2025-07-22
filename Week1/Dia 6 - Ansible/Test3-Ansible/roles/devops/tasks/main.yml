@@ -1,0 +1,32 @@
+---    
+    - name: Instalar paquetes esenciales
+      apt:
+        name: ["git", "tree", "htop", "nginx", "unzip", "ufw"]
+        state: present
+        update_cache: yes  
+
+    - name: Unarchive a file that needs to be downloaded
+      ansible.builtin.unarchive:
+        src: https://github.com/StartBootstrap/startbootstrap-freelancer/archive/refs/heads/gh-pages.zip
+        dest: /home/vagrant/
+        remote_src: yes
+
+    - name: Create a directory bootstrap in /var/www/ if it does not exist
+      ansible.builtin.file:
+        path: /var/www/bootstrap/
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+    
+    #- name: Create a directory bootstrap in /etc/nginx/sites-enabled if it does not exist
+      #ansible.builtin.file:
+        #path: /etc/nginx/sites-enabled/bootstrap
+        #state: directory
+        #mode: '0755'
+
+    - name: Copy files from the folder
+      shell: |
+        cd /home/vagrant/
+        cp -a startbootstrap-freelancer-gh-pages/. /var/www/bootstrap/
+        chown -R www-data:www-data /var/www/bootstrap/
