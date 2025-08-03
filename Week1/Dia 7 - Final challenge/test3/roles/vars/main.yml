@@ -1,0 +1,6 @@
+---
+# PostgreSQL Setup Tasks
+# Variables to define elsewhere in your playbook:
+postgresql_version: "14"
+postgres_password: "{{ vault_postgres_password | default('postgres') }}"
+database_name: "votes"

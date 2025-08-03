@@ -1,0 +1,17 @@
+---
+- name: tarea de configuracion basica de servidor
+  hosts: managed_nodes
+  become: true
+  vars:
+    postgresql_version: "14"
+    postgres_password: "{{ vault_postgres_password | default('postgres') }}"
+    database_name: "votes"
+  roles:
+    - devops
+    - postgresql
+    - gunicorn
+    - pm2
+    - nginx
+    
+    
+

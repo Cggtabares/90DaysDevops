@@ -1,0 +1,40 @@
+---
+    - name: Install result packages based on package.json.
+      community.general.npm:
+        path: /var/www/voting-app/roxs-voting-app/worker
+
+    - name: Install worker packages based on package.json.
+      community.general.npm:
+        path: /var/www/voting-app/roxs-voting-app/result
+    
+    - name: Create ecosystem config with proper port separation
+      ansible.builtin.copy:
+        dest: "/var/www/voting-app/roxs-voting-app/ecosystem.config.js"
+        content: |
+          module.exports = {
+            apps: [
+              {
+                name: 'worker',
+                script: './worker/main.js',
+                env: {
+                  WORKER_METRICS_PORT: 3001,  // Internal metrics only
+                  NODE_ENV: "development"
+                }
+              },
+              {
+                name: 'result',
+                script: './result/main.js',
+                env: {
+                  APP_PORT: 3000,            // Public web interface
+                  NODE_ENV: "development"
+                }
+              }
+            ]
+          }
+        mode: '0644'
+
+    - name: activate ecosystem with pm2
+      ansible.builtin.command: pm2 start /var/www/voting-app/roxs-voting-app/ecosystem.config.js --env development
+      args:
+        chdir: /var/www/voting-app/roxs-voting-app/
+      

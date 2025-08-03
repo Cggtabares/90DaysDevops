@@ -1,0 +1,29 @@
+---   
+    - name: Copiar archivo de conf de Nginx
+      ansible.builtin.copy:
+        src: /home/vagrant/nginx.conf
+        dest: /etc/nginx/sites-available/nginx.conf
+
+    - name: Eliminar default file de Nginx
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Habilitar sitio
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/nginx.conf
+        dest: /etc/nginx/sites-enabled/nginx.conf
+        state: link
+    
+    - name: Test nginx configuration
+      command: nginx -t
+      register: nginx_test
+      
+    - name: Show nginx test results
+      debug:
+        var: nginx_test
+
+    - name: Restart service nginx, in all cases
+      ansible.builtin.service:
+        name: nginx
+        state: restarted

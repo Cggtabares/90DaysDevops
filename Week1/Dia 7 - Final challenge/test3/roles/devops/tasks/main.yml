@@ -1,0 +1,89 @@
+---
+    - name: Install base packages
+      apt:
+        name: 
+          - python3
+          - python3-pip
+          - python3.10-venv
+          - nginx
+          - git
+          - nodejs
+          - npm
+          - redis-server
+          - postgresql
+          - postgresql-contrib
+          - lsof
+          - ufw
+          - unzip
+        state: present
+        update_cache: yes
+
+    - name: Download project archive
+      get_url:
+        url: https://github.com/roxsross/roxs-devops-project90/archive/refs/heads/master.zip
+        dest: /home/vagrant/master.zip
+        mode: '0644'
+
+    - name: Extract project archive
+      unarchive:
+        src: /home/vagrant/master.zip
+        dest: /home/vagrant/
+        remote_src: yes
+
+    - name: Clean up downloaded archive
+      file:
+        path: /home/vagrant/master.zip
+        state: absent
+
+    - name: Install PM2
+      shell: |
+        sudo npm install -g pm2
+
+    - name: Enable service redis-server, and not touch the state
+      ansible.builtin.service:
+        name: redis-server
+        enabled: yes
+
+    - name: Enable service postgresql, and not touch the state
+      ansible.builtin.service:
+        name: postgresql
+        enabled: yes
+
+    - name: Enable service nginx, and not touch the state
+      ansible.builtin.service:
+        name: nginx
+        enabled: yes
+
+    - name: Start service redis-server, and not touch the state
+      ansible.builtin.service:
+        name: redis-server
+        state: started
+
+    - name: Start service postgresql, and not touch the state
+      ansible.builtin.service:
+        name: postgresql
+        state: started
+
+    - name: Start service nginx, and not touch the state
+      ansible.builtin.service:
+        name: nginx
+        state: started
+
+    - name: echo Database_host
+      shell: "echo $DATABASE_HOST"
+      environment:
+        DATABASE_HOST: 'localhost'
+
+    - name: Create a directory voting-app in /var/www/ if it does not exist
+      ansible.builtin.file:
+        path: /var/www/voting-app/
+        state: directory
+        mode: '0755'
+        owner: www-data
+        group: www-data
+
+    - name: Copy files from the folder
+      shell: |
+        cd /home/vagrant/
+        cp -a roxs-devops-project90-master/. /var/www/voting-app/
+        chown -R www-data:www-data /var/www/voting-app/

@@ -34,7 +34,7 @@ instalar_dependencias_app() {
         npm install
         cd ..
         echo "Instalando dependencias de products"
-        cd products/
+        cd products/ls
         npm install
         cd ..
         echo "Instalando dependencias de shopping-cart"

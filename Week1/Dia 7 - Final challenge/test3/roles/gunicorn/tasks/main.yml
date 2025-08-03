@@ -1,0 +1,13 @@
+---
+    - name: Install specified python requirements
+      ansible.builtin.pip:
+        requirements: /var/www/voting-app/roxs-voting-app/vote/requirements.txt
+        virtualenv: /var/www/voting-app/roxs-voting-app/vote/venv
+        virtualenv_command: python3 -m venv
+
+    - name: activate app with gunicorn
+      shell: /var/www/voting-app/roxs-voting-app/vote/venv/bin/gunicorn -w 4 -b 127.0.0.1:8000 app:app --daemon
+      args:
+        chdir: /var/www/voting-app/roxs-voting-app/vote/
+
+    

@@ -1,0 +1,62 @@
+﻿---
+# PostgreSQL Setup Tasks - Shell command approach (avoids ACL issues)
+# Variables to define elsewhere in your playbook:
+# postgresql_version: "14"
+# postgres_password: "{{ vault_postgres_password | default('postgres') }}"
+# database_name: "votes"
+
+- name: Install PostgreSQL packages (Ubuntu/Debian)
+  apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Initialize PostgreSQL database (CentOS/RHEL only)
+  command: postgresql-setup initdb
+  args:
+    creates: /var/lib/pgsql/data/postgresql.conf
+  when: ansible_os_family == "RedHat"
+
+- name: Start and enable PostgreSQL service
+  ansible.builtin.service:
+    name: postgresql
+    state: started
+    enabled: yes
+
+# Use shell commands with sudo to avoid ACL issues
+- name: Set PostgreSQL postgres user password
+  shell: |
+    sudo -u postgres psql -c "ALTER USER postgres PASSWORD '{{ postgres_password }}';"
+  args:
+    executable: /bin/bash
+
+- name: Create votes database
+  shell: |
+    sudo -u postgres createdb {{ database_name }} 2>/dev/null || true
+  args:
+    executable: /bin/bash
+
+- name: Create votes table
+  shell: |
+    sudo -u postgres psql -d {{ database_name }} -c "
+    CREATE TABLE IF NOT EXISTS votes (
+        id VARCHAR(255) PRIMARY KEY,
+        vote VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );"
+  args:
+    executable: /bin/bash
+
+- name: Verify votes table exists
+  shell: |
+    sudo -u postgres psql -d {{ database_name }} -c "SELECT table_name FROM information_schema.tables WHERE table_name = 'votes';"
+  args:
+    executable: /bin/bash
+  register: table_check
+
+- name: Show table verification result
+  debug:
+    var: table_check.stdout
